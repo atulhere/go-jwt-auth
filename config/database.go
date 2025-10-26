@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+
 	"github.com/spf13/viper"
 )
 
@@ -14,7 +16,7 @@ type DatabaseConfig struct {
 
 var databaseConfig DatabaseConfig
 
-func getDatabaseConfig() *DatabaseConfig {
+func GetDatabaseConfig() *DatabaseConfig {
 	return &databaseConfig
 }
 
@@ -28,5 +30,7 @@ func LoadDatabaseConfig() {
 		Password: viper.GetString("DATABASE_PASSWORD"),
 		Port:     viper.GetString("DATABASE_PORT"),
 	}
+
+	fmt.Println("Host is: ", databaseConfig.Host, databaseConfig.Database)
 
 }

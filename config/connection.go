@@ -11,9 +11,7 @@ import (
 func ConnectDB() *sql.DB {
 
 	fmt.Println("Connecting to Database...")
-	databaseConfig := getDatabaseConfig()
-
-	fmt.Println("Database Config:", databaseConfig.Database)
+	var databaseConfig = GetDatabaseConfig()
 
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s",
 		databaseConfig.User,
@@ -24,15 +22,14 @@ func ConnectDB() *sql.DB {
 	)
 
 	db, err := sql.Open("mysql", dsn)
-
-	fmt.Println("Opening DB...", err)
-	db.Ping()
 	if err != nil {
-
 		log.Fatalf("Error opening DB: %v", err)
 	}
+	defer db.Close() // Ensure the database connection is closed when done
 
-	// Now check if we can actually connect
+	fmt.Println("Opening DB...")
+	fmt.Println(dsn)
+
 	if err := db.Ping(); err != nil {
 		log.Fatalf("Database connection failed: %v", err)
 	}
