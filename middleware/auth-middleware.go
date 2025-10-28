@@ -17,6 +17,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 		claims, err := utility.ParseAccessToken(tokenStr)
+		//fmt.Println(claims.UserID)
 		if err != nil {
 			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
 			return

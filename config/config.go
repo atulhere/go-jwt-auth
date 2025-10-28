@@ -1,17 +1,21 @@
 package config
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/spf13/viper"
 )
 
 func LoadConfig() {
 
-	fmt.Println("Yaha Tak Aa aa raha hain")
 	viper.SetConfigFile(".env")
-	viper.ReadInConfig()
-	//LoadDatabaseConfig()
-	LoadApplicationConfig()
+	err := viper.ReadInConfig() // fallback to system env variables if not in file
 
+	// Read the .env file
+	if err != nil {
+		log.Fatalf("Error reading config file: %v", err)
+	}
+
+	LoadApplicationConfig()
+	LoadDatabaseConfig()
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"go-jwt-auth/config"
@@ -13,17 +14,19 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var dbConfig = config.ConnectDB()
-
 func GoogleLogin(w http.ResponseWriter, r *http.Request) {
-	url := utility.GoogleOAuthConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+
+	url := config.GoogleOAuthConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	//fmt.Println("URL String is   ", url)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
 func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
-	token, err := utility.GoogleOAuthConfig.Exchange(context.Background(), code)
+	token, err := config.GoogleOAuthConfig.Exchange(context.Background(), code)
 	if err != nil {
+		fmt.Println(err)
+		fmt.Println("+++++++++++++++++++++++")
 		http.Error(w, "Token exchange failed", http.StatusBadRequest)
 		return
 	}
@@ -36,13 +39,13 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user model.User
-	row := dbConfig.QueryRow("SELECT id, email FROM users WHERE google_id=?", payload.Subject)
+	row := config.DB.QueryRow("SELECT id, email FROM users WHERE google_id=?", payload.Subject)
 	if err := row.Scan(&user.ID, &user.Email); err == sql.ErrNoRows {
-		res, _ := dbConfig.Exec("INSERT INTO users (google_id, email, name, picture, created_at, last_login_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+		res, _ := config.DB.Exec("INSERT INTO users (google_id, email, name, picture, created_at, last_login_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
 			payload.Subject, payload.Claims["email"], payload.Claims["name"], payload.Claims["picture"])
 		user.ID, _ = res.LastInsertId()
 	} else {
-		dbConfig.Exec("UPDATE users SET last_login_at=NOW() WHERE id=?", user.ID)
+		config.DB.Exec("UPDATE users SET last_login_at=NOW() WHERE id=?", user.ID)
 	}
 
 	accessToken, _ := utility.GenerateAccessToken(user.ID)
@@ -54,7 +57,7 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbConfig.Exec("UPDATE users SET refresh_token=? WHERE id=?", refreshToken, user.ID)
+	config.DB.Exec("UPDATE users SET refresh_token=? WHERE id=?", refreshToken, user.ID)
 
 	resp := map[string]string{
 		"access_token":  accessToken,
@@ -64,11 +67,16 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func RefreshToken(w http.ResponseWriter, r *http.Request) {
-	var req struct{ RefreshToken string }
-	json.NewDecoder(r.Body).Decode(&req)
+
+	type req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	var request req
+	//var req struct{ RefreshToken string `refresh_token` }
+	json.NewDecoder(r.Body).Decode(&request)
 
 	var userID int64
-	err := dbConfig.QueryRow("SELECT id FROM users WHERE refresh_token=?", req.RefreshToken).Scan(&userID)
+	err := config.DB.QueryRow("SELECT id FROM users WHERE refresh_token=?", request.RefreshToken).Scan(&userID)
 	if err != nil {
 		http.Error(w, "Invalid refresh token", http.StatusUnauthorized)
 		return
@@ -80,6 +88,6 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 
 func Logout(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(int64)
-	dbConfig.Exec("UPDATE users SET refresh_token=NULL WHERE id=?", userID)
+	config.DB.Exec("UPDATE users SET refresh_token=NULL WHERE id=?", userID)
 	w.WriteHeader(http.StatusOK)
 }
